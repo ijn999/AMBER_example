@@ -1,0 +1,11 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Detection results (regenerable from the code)
+Detect/results_*.txt
+
+# OS
+.DS_Store
+Thumbs.db

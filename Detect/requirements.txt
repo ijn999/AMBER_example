@@ -1,0 +1,8 @@
+# Python dependencies for the AMBER example detection pipeline (Detect/).
+# Install: pip install -r requirements.txt
+
+numpy
+scikit-learn
+onnx
+torch
+torch_geometric
