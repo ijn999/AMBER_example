@@ -105,6 +105,8 @@ python detect.py --project RCNN --mode feature --kernel rbf --nu 0.1 --n_folds 5
 
 Results are automatically saved to `Detect/results_{architecture}.txt`.
 
+> **Standardization protocol.** The feature standardizer is fit **only on the benign training partition** of each split, then applied to both the train and test partitions. Fitting the standardizer on the full feature matrix (benign + backdoor) before the train/test split would leak test/backdoor statistics into the scaler mean/variance and systematically inflate detection rates. The `detect.py` script follows the controlled (leak-free) protocol.
+
 ### Key Parameters
 
 | Parameter | Default | Description |

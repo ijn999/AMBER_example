@@ -56,9 +56,10 @@ def _run_detection(X, y, all_model_ids, samples_meta, cfg, args, stealth_map):
     print(f"{'='*60}")
     print(f"Models: {len(X)} (benign={int((y==0).sum())}, backdoor={int((y==1).sum())})")
 
-    # Standardize
-    scaler = StandardScaler()
-    X_scaled = scaler.fit_transform(X)
+    # NOTE: Standardization is fit ONLY on the benign training partition of each
+    # split, then applied to train+test. Fitting on the full matrix (benign +
+    # backdoor) before splitting leaks test/backdoor statistics into the scaler
+    # mean/variance and systematically inflates detection rates.
 
     # Feature importance hints — only show discriminating features (ratio far from 1)
     print(f"\nKey discriminating features (ratio < 0.5 or > 1.5):")
@@ -93,12 +94,15 @@ def _run_detection(X, y, all_model_ids, samples_meta, cfg, args, stealth_map):
             aucs, accs, f1s = [], [], []
 
             skf = StratifiedKFold(n_splits=args.n_folds, shuffle=True, random_state=args.seed)
-            for fold, (train_idx, test_idx) in enumerate(skf.split(X_scaled, y)):
+            for fold, (train_idx, test_idx) in enumerate(skf.split(X, y)):
                 benign_train_mask = y[train_idx] == 0
                 ocsvm_train_idx = train_idx[benign_train_mask]
 
-                X_train = X_scaled[ocsvm_train_idx]
-                X_test = X_scaled[test_idx]
+                # Fit scaler on benign training fold only, then transform.
+                fold_scaler = StandardScaler()
+                fold_scaler.fit(X[ocsvm_train_idx])
+                X_train = fold_scaler.transform(X[ocsvm_train_idx])
+                X_test = fold_scaler.transform(X[test_idx])
                 y_test = y[test_idx]
 
                 clf = OneClassSVM(kernel=args.kernel, nu=args.nu, gamma=args.gamma)
@@ -132,8 +136,11 @@ def _run_detection(X, y, all_model_ids, samples_meta, cfg, args, stealth_map):
     train_benign = perm[:n_train_benign]
     test_idx = np.concatenate([perm[n_train_benign:], backdoor_idx])
 
-    X_train = X_scaled[train_benign]
-    X_test = X_scaled[test_idx]
+    # Fit scaler on benign training partition only, then transform train+test.
+    final_scaler = StandardScaler()
+    final_scaler.fit(X[train_benign])
+    X_train = final_scaler.transform(X[train_benign])
+    X_test = final_scaler.transform(X[test_idx])
     y_test = y[test_idx]
     test_ids = [all_model_ids[i] for i in test_idx]
 
