@@ -5,9 +5,9 @@ Extracts 23-dimensional structural features from ONNX computational graphs and u
 One-Class SVM for detection. Only ONNX files are used.
 
 Usage:
-    python detect.py --project MalConvBase --mode feature --kernel rbf --nu 0.3 --n_folds 5
-    python detect.py --project MalConvPlus --mode feature --kernel rbf --nu 0.3 --n_folds 5
-    python detect.py --project RCNN --mode feature --kernel rbf --nu 0.3 --n_folds 5
+    python detect.py --project MalConvBase --mode feature --kernel rbf --nu 0.1 --n_folds 5
+    python detect.py --project MalConvPlus --mode feature --kernel rbf --nu 0.1 --n_folds 5
+    python detect.py --project RCNN --mode feature --kernel rbf --nu 0.1 --n_folds 5
 """
 
 import argparse
@@ -92,6 +92,7 @@ def _run_detection(X, y, all_model_ids, samples_meta, cfg, args, stealth_map):
         else:
             print(f"\nCross-validation ({args.n_folds} folds):")
             aucs, accs, f1s = [], [], []
+            tprs, tnrs, balaccs = [], [], []
 
             skf = StratifiedKFold(n_splits=args.n_folds, shuffle=True, random_state=args.seed)
             for fold, (train_idx, test_idx) in enumerate(skf.split(X, y)):
@@ -118,10 +119,23 @@ def _run_detection(X, y, all_model_ids, samples_meta, cfg, args, stealth_map):
                 aucs.append(auc)
                 accs.append(acc)
                 f1s.append(f1)
+                # Paper-aligned metrics: TPR, TNR, BalAcc (see Sec. 4).
+                tpr_f = (((y_test == 1) & (preds == 1)).sum() /
+                         (y_test == 1).sum()) if (y_test == 1).sum() > 0 else 0.0
+                tnr_f = (((y_test == 0) & (preds == 0)).sum() /
+                         (y_test == 0).sum()) if (y_test == 0).sum() > 0 else 0.0
+                balacc_f = (tpr_f + tnr_f) / 2.0
+                tprs.append(tpr_f)
+                tnrs.append(tnr_f)
+                balaccs.append(balacc_f)
 
             print(f"  Avg AUC={np.mean(aucs):.4f}±{np.std(aucs):.4f}  "
                   f"ACC={np.mean(accs):.4f}±{np.std(accs):.4f}  "
                   f"F1={np.mean(f1s):.4f}±{np.std(f1s):.4f}")
+            print(f"  Paper metrics: "
+                  f"TPR={np.mean(tprs):.4f}±{np.std(tprs):.4f}  "
+                  f"TNR={np.mean(tnrs):.4f}±{np.std(tnrs):.4f}  "
+                  f"BalAcc={np.mean(balaccs):.4f}±{np.std(balaccs):.4f}")
 
     # Final train/test split
     print(f"\n{'='*60}")
@@ -167,6 +181,14 @@ def _run_detection(X, y, all_model_ids, samples_meta, cfg, args, stealth_map):
     m_prec = bd_detected / (preds == 1).sum() if (preds == 1).sum() > 0 else 0
     m_rec = bd_detected / bd_total if bd_total > 0 else 0
     print(f"Benign: P={b_prec:.2f} R={b_rec:.2f}  Backdoor: P={m_prec:.2f} R={m_rec:.2f}")
+    # Metrics aligned with the paper (Sec. 4): TPR (backdoor recall), TNR (benign
+    # recall), and balanced accuracy BalAcc = (TPR + TNR) / 2. These are the
+    # metrics reported in the main benchmark; AUC/ACC/F1 above are kept for
+    # additional reference.
+    tnr = benign_correct / benign_total if benign_total > 0 else 0.0
+    tpr = bd_detected / bd_total if bd_total > 0 else 0.0
+    balacc = (tpr + tnr) / 2.0
+    print(f"Paper metrics: TPR={tpr:.4f}, TNR={tnr:.4f}, BalAcc={balacc:.4f}")
 
     # Per-model results — show all models, mark misclassifications
     print(f"\nPer-model results:")
@@ -233,7 +255,8 @@ def main():
                         choices=["rbf", "linear", "poly"])
     parser.add_argument("--nu", type=float, default=0.1,
                         help="OC-SVM nu (upper bound on training outliers). "
-                             "0.3 is the benchmark setting used in the README.")
+                             "0.1 is the benchmark setting for feature mode (nu=0.3 is "
+                             "used for hybrid mode, not available in this example).")
     parser.add_argument("--gamma", type=str, default="scale")
     parser.add_argument("--train_ratio", type=float, default=0.7)
     parser.add_argument("--seed", type=int, default=42)

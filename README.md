@@ -24,7 +24,7 @@ This repository (`AMBER_example`) is a reduced example subset of the full AMBER 
 |-------|-------|-------------|
 | L0 | 485 | Benign (no backdoor) |
 | L1 | 244 | Explicit — interleaved any-integration (B=3), or shared+targeted (B=2 AND C=1); clear traces in code size / component count / data-flow |
-| L2 | 234 | Medium-risk/Semi-covert — separate/shared propagation with untargeted integration; a single flaw in Detection or Propagation |
+| L2 | 234 | Medium-risk/Semi-covert — configurations that do not meet the L1 or L3 criteria: constant trigger (A=1) with separate/shared path (B=1 or 2) and either output type, plus operator trigger (A=2) with separate path (B=1) and targeted output (C=1). Partial — but not simultaneous — reduction of trigger-side and behavior-side exposure |
 | L3 | 237 | Covert — operator trigger (A=2) + untargeted noise (C=2); optimal on both structural overhead and statistical audit camouflage |
 
 ### Architecture Breakdown (subset)
@@ -95,7 +95,7 @@ pip install scikit-learn numpy onnx torch torch_geometric
 ### Run Detection
 
 ```bash
-cd AMBER_example/Detect
+cd Detect
 
 # Detect backdoors in one architecture (5-fold cross-validation, results saved automatically)
 python detect.py --project MalConvBase --mode feature --kernel rbf --nu 0.1 --n_folds 5
